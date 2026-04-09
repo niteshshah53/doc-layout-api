@@ -1,9 +1,9 @@
 # Document Layout Detection API
 
-A simple REST API that analyzes document images and automatically detects different parts like titles, text, tables, and figures.
+A production-ready REST API that detects objects and regions in images using a Faster R-CNN model trained on the COCO dataset.
 
 **What does it do?**  
-Upload an image of a document (PDF page, scanned document, etc.), and it will identify and locate all the content blocks within it. Perfect for document processing, OCR pipelines, or automated document understanding.
+Upload an image and it will automatically detect objects, identify their locations with bounding boxes, and provide confidence scores. Works with general images containing people, animals, vehicles, furniture, and other common objects. Perfect for image analysis, object detection pipelines, and automated content understanding.
 
 ---
 
@@ -21,8 +21,8 @@ Before getting started, make sure you have:
 
 ## Tech Stack
 - **FastAPI** — Web framework for building the API
-- **Detectron2 + layoutparser** — AI model that detects document layouts
-- **PyTorch** — Deep learning library
+- **Detectron2 + layoutparser** — COCO-Detection Faster R-CNN model for general object detection
+- **PyTorch 2.5.1** — Deep learning library
 - **Docker** — Package the app to run anywhere
 - **Pydantic** — Validation for inputs/outputs
 
@@ -92,10 +92,11 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**⚠️ Tip:** If you see errors about `detectron2`, it's normal — the `install.sh` script handles this:
+**⚠️ Important:** This project requires PyTorch 2.5.1+ and torchvision 0.20.1+ for compatibility. If you encounter errors:
 ```bash
 bash install.sh
 ```
+This script automatically installs compatible versions and configures Detectron2.
 
 ### Step 4: Setup Configuration
 ```bash
@@ -197,19 +198,19 @@ print(response.json())
 ### Example Response
 ```json
 {
-  "num_blocks": 3,
-  "image_size": {"width": 2480, "height": 3508},
-  "inference_time_ms": 87.4,
+  "num_blocks": 2,
+  "image_size": {"width": 1344, "height": 2016},
+  "inference_time_ms": 418.39,
   "blocks": [
     {
-      "label": "Title",
-      "confidence": 0.95,
-      "bbox": [100, 50, 500, 150]
+      "label": "Object",
+      "score": 0.9542,
+      "bbox": {"x1": 120.0, "y1": 98.0, "x2": 1240.0, "y2": 800.0}
     },
     {
-      "label": "Text",
-      "confidence": 0.92,
-      "bbox": [100, 160, 500, 400]
+      "label": "Object",
+      "score": 0.8913,
+      "bbox": {"x1": 150.0, "y1": 850.0, "x2": 1200.0, "y2": 1500.0}
     }
   ]
 }
@@ -237,26 +238,39 @@ Upload a document image, receive layout predictions.
 **Response:**
 ```json
 {
-  "num_blocks": 3,
-  "image_size": {"width": 2480, "height": 3508},
-  "inference_time_ms": 87.4,
+  "num_blocks": 2,
+  "image_size": {"width": 1344, "height": 2016},
+  "inference_time_ms": 418.39,
   "blocks": [
     {
-      "label": "Title",
-      "score": 0.9821,
-      "bbox": {"x1": 120.0, "y1": 98.0, "x2": 1400.0, "y2": 160.0}
+      "label": "Object",
+      "score": 0.9542,
+      "bbox": {"x1": 120.0, "y1": 98.0, "x2": 1240.0, "y2": 800.0}
     },
     {
-      "label": "Text",
-      "score": 0.9543,
-      "bbox": {"x1": 120.0, "y1": 200.0, "x2": 1400.0, "y2": 800.0}
+      "label": "Object",
+      "score": 0.8913,
+      "bbox": {"x1": 150.0, "y1": 850.0, "x2": 1200.0, "y2": 1500.0}
     }
   ]
 }
 ```
 
 ### `GET /api/v1/health`
-Health check endpoint for Docker/load balancer monitoring.
+Health check endpoint for Docker/load balancer monitoring. Returns model status including which variant is loaded (primary/fallback).
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "model_info": {
+    "type": "primary",
+    "error": null
+  },
+  "version": "1.0.0"
+}
+```
 
 ---
 
@@ -284,9 +298,24 @@ All settings can be overridden via environment variables or `.env`:
 
 ---
 
-## Performance Notes
+## Model & Performance
 
-- Model loads **once at startup** — not per request
+### Current Model
+- **Type:** Faster R-CNN with ResNet-50 backbone trained on COCO dataset
+- **Detects:** General objects (people, vehicles, animals, furniture, etc.)
+- **Does NOT detect:** Document-specific elements (titles, paragraphs, tables)
+
+### Fallback Mechanism
+If the primary model fails to load, the API automatically cascades through:
+1. **Primary:** COCO-Detection Faster R-CNN (GPU)
+2. **Fallback-1:** Mask R-CNN variant (GPU)
+3. **Fallback-2:** Same model on CPU (slower but always available)
+
+The `/api/v1/health` endpoint shows which model is loaded.
+
+### Performance Notes
+- Model loads **once at startup** — not per request (typically 1-2 seconds)
 - `torch.no_grad()` applied during inference — ~50% less GPU memory
 - Images are resized to `MAX_IMAGE_SIZE` before inference
-- Typical GPU inference time: **50–150ms** per image
+- Typical GPU inference time: **50–500ms** per image (depends on image complexity)
+- GPU memory used: ~0.17GB with default settings
