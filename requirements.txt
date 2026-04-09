@@ -1,30 +1,58 @@
-# Core API
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-python-multipart==0.0.9      # required for FastAPI file uploads
+# ============================================
+# DOCUMENT LAYOUT API - DEPENDENCIES
+# ============================================
+# This file lists all Python packages needed to run the API
+# Install them all with: pip install -r requirements.txt
 
-# ML / Inference
-torch==2.3.0
-torchvision==0.18.0
-timm==1.0.3                  # backbone pretrained weights
+# ============================================
+# WEB API (FastAPI)
+# ============================================
+# These packages handle HTTP requests and responses
+fastapi==0.111.0                  # Modern web framework for building APIs
+uvicorn[standard]==0.30.1         # Server that runs the API
+python-multipart==0.0.9           # Required for file uploads (e.g., document images)
 
-# Document Layout Detection
-# NOTE: detectron2 must be installed AFTER torch — see install instructions below
-layoutparser==0.3.4
+# ============================================
+# MACHINE LEARNING & AI (PyTorch)
+# ============================================
+# These packages power the document layout detection model
+torch==2.3.0                      # PyTorch - deep learning framework
+torchvision==0.18.0               # Computer vision library (image processing for AI)
+timm==1.0.3                       # Pre-trained model weights and architectures
 
-# Image processing
-Pillow==10.3.0
-opencv-python-headless==4.9.0.80   # headless = no GUI deps (important for Docker)
-numpy==1.26.4
+# ============================================
+# DOCUMENT LAYOUT DETECTION
+# ============================================
+# The AI model that actually detects layouts in documents
+layoutparser==0.3.4               # Document layout parsing library
+# NOTE: detectron2 (part of layoutparser) must be installed AFTER torch
+# If installation fails, use: bash install.sh
 
-# Validation & config
-pydantic==2.7.1
-pydantic-settings==2.3.0     # for environment variable config
+# ============================================
+# IMAGE PROCESSING
+# ============================================
+# Tools for reading and manipulating images
+Pillow==10.3.0                    # Image reading/writing (PNG, JPEG, BMP, etc.)
+opencv-python-headless==4.9.0.80  # Image processing toolkit (headless = no GUI needed for Docker)
+numpy==1.26.4                     # Numerical computing library (arrays, matrices)
 
-# Testing
-pytest==8.2.2
-httpx==0.27.0                # async test client for FastAPI
+# ============================================
+# CONFIGURATION & VALIDATION
+# ============================================
+# These validate inputs and read configuration
+pydantic==2.7.1                   # Data validation library (checks API inputs)
+pydantic-settings==2.3.0          # Read environment variables (.env file)
+python-dotenv==1.0.1              # Load environment variables from .env file
 
-# Utilities
-python-dotenv==1.0.1
-loguru==0.7.2                # better logging than stdlib
+# ============================================
+# LOGGING (Better Error Messages)
+# ============================================
+loguru==0.7.2                     # Better logging than Python's built-in (helpful for debugging)
+
+# ============================================
+# TESTING (Optional - for running tests)
+# ============================================
+# These are only used when running tests with: pytest
+pytest==8.2.2                     # Testing framework
+httpx==0.27.0                     # Async HTTP client for testing the API
+

@@ -1,15 +1,30 @@
 # Document Layout Detection API
 
-A production-ready REST API for document layout segmentation.
-Detects **text blocks, titles, tables, figures, and lists** in document images
-using a [PubLayNet](https://github.com/ibm-aur-nlp/PubLayNet)-trained Detectron2 model.
+A simple REST API that analyzes document images and automatically detects different parts like titles, text, tables, and figures.
+
+**What does it do?**  
+Upload an image of a document (PDF page, scanned document, etc.), and it will identify and locate all the content blocks within it. Perfect for document processing, OCR pipelines, or automated document understanding.
+
+---
+
+## Prerequisites
+
+Before getting started, make sure you have:
+- **Python 3.9+** installed ([download here](https://www.python.org/downloads/))
+- **Git** installed ([download here](https://git-scm.com/))
+- (Optional) **Docker** for containerized deployment ([download here](https://www.docker.com/))
+- (Optional) **NVIDIA GPU** with CUDA toolkit for faster inference (CPU-only is also supported)
+
+**Not sure what these are?** Don't worry! The quickstart guide below will walk you through everything step-by-step.
+
+---
 
 ## Tech Stack
-- **FastAPI** — REST API framework
-- **layoutparser + Detectron2** — document layout detection
-- **PyTorch** — inference backend (CUDA GPU acceleration)
-- **Docker** — containerised deployment
-- **Pydantic v2** — request/response validation
+- **FastAPI** — Web framework for building the API
+- **Detectron2 + layoutparser** — AI model that detects document layouts
+- **PyTorch** — Deep learning library
+- **Docker** — Package the app to run anywhere
+- **Pydantic** — Validation for inputs/outputs
 
 ---
 
@@ -35,48 +50,171 @@ doc-layout-api/
 
 ---
 
-## Quick Start (Local)
+## Installation & Quick Start (For Beginners)
 
-### 1. Clone and set up environment
+### Step 1: Clone the Repository
 ```bash
-git clone <your-repo>
+# Copy the repository to your computer
+git clone https://github.com/niteshshah53/doc-layout-api.git
 cd doc-layout-api
+```
+
+### Step 2: Create a Virtual Environment
+A virtual environment isolates this project's dependencies from others on your computer.
+
+```bash
+# Create the environment
 python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
+
+# Activate it
+# On macOS/Linux:
+source .venv/bin/activate
+
+# On Windows:
+.venv\Scripts\activate
+
+# You should see (.venv) at the start of your terminal prompt
+```
+
+### Step 3: Install Dependencies
+```bash
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install all required packages
 pip install -r requirements.txt
 ```
 
-If `install.sh` is used instead of the raw requirements file, it will try the
-prebuilt Detectron2 wheel first and fall back to a source build when no wheel
-matches your Python version. If both paths fail, use Python 3.10 with a CUDA
-toolkit-enabled environment.
-
-### 2. Configure environment
+**⚠️ Tip:** If you see errors about `detectron2`, it's normal — the `install.sh` script handles this:
 ```bash
-cp .env.example .env
-# Edit .env — set DEVICE=cpu if no GPU
+bash install.sh
 ```
 
-### 3. Run the API
+### Step 4: Setup Configuration
 ```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Optional: Edit .env if you want to use CPU instead of GPU
+# Change: DEVICE=cuda to DEVICE=cpu
+```
+
+### Step 5: Run the API
+```bash
+# Start the API server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Open Swagger UI
-Navigate to: http://localhost:8000/docs
+You should see output like:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000
+INFO:     Press CTRL+C to quit
+```
+
+### Step 6: Test the API
+Open your browser and go to: **http://localhost:8000/docs**
+
+You'll see an interactive interface where you can test the API by uploading a document image!
 
 ---
 
-## Quick Start (Docker)
+## Quick Start (Docker - Simpler Alternative)
 
-### With GPU (NVIDIA):
+If you prefer not to install Python dependencies locally, use Docker:
+
 ```bash
+# Build and run with Docker (uses GPU if available)
 docker compose up --build
 ```
 
-### Without GPU (CPU only):
+**Without GPU (CPU only):**
 ```bash
 DEVICE=cpu docker compose up --build
+```
+
+The API will be available at: http://localhost:8000/docs
+
+---
+
+## Troubleshooting for Beginners
+
+**Q: I get "command not found: python"**  
+A: Python isn't installed or not in your PATH. [Install Python](https://www.python.org/downloads/) and retry.
+
+**Q: Virtual environment activation didn't work**  
+A: Make sure you're in the project directory (`doc-layout-api/`) and try again.
+
+**Q: "pip install" fails**  
+A: Try upgrading pip first:
+```bash
+python -m pip install --upgrade pip
+```
+
+**Q: "detectron2" installation fails**  
+A: Run `bash install.sh` instead — it handles special cases.
+
+**Q: GPU not detected**  
+A: Use CPU instead by setting `DEVICE=cpu` in `.env`
+
+**Q: Still stuck?**  
+A: Check you're using Python 3.9+ (`python --version`)
+
+---
+
+## How to Use the API
+
+### Upload a Document Image
+
+**Easiest Way: Use the Web UI**
+1. Go to http://localhost:8000/docs
+2. Click "Try it out"
+3. Upload a document image (PNG, JPEG, TIFF, etc.)
+4. Click "Execute"
+
+**Using cURL (Command Line):**
+```bash
+curl -X POST "http://localhost:8000/api/v1/predict" \
+  -H "accept: application/json" \
+  -F "file=@path/to/your/document.png"
+```
+
+**Using Python:**
+```python
+import requests
+
+files = {"file": open("document.png", "rb")}
+response = requests.post("http://localhost:8000/api/v1/predict", files=files)
+print(response.json())
+```
+
+### Example Response
+```json
+{
+  "num_blocks": 3,
+  "image_size": {"width": 2480, "height": 3508},
+  "inference_time_ms": 87.4,
+  "blocks": [
+    {
+      "label": "Title",
+      "confidence": 0.95,
+      "bbox": [100, 50, 500, 150]
+    },
+    {
+      "label": "Text",
+      "confidence": 0.92,
+      "bbox": [100, 160, 500, 400]
+    }
+  ]
+}
+```
+
+---
+
+## Running Tests (Optional)
+
+To verify everything works correctly:
+```bash
+pytest
 ```
 
 ---
