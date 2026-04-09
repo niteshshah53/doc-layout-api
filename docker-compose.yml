@@ -1,0 +1,51 @@
+# docker-compose.yml
+# Usage:
+#   docker compose up --build          # build and start
+#   docker compose up -d               # run in background
+#   docker compose logs -f api         # follow logs
+#   docker compose down                # stop and remove containers
+
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime   # use the final stage, not the builder
+    image: doc-layout-api:latest
+    container_name: doc-layout-api
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      - DEVICE=cuda              # change to "cpu" if no GPU
+      - MAX_FILE_SIZE_MB=10
+      - DEBUG=false
+
+    # ── GPU access ───────────────────────────────────────────────────────
+    # Exposes all available NVIDIA GPUs to the container.
+    # Requires nvidia-container-toolkit installed on the host.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # ── Volumes ──────────────────────────────────────────────────────────
+    # Mount model weights directory from host so they survive container restarts
+    # and you don't have to re-download them on every build.
+    volumes:
+      - ./models:/app/models:ro    # read-only mount
+
+    # ── Health & restart ─────────────────────────────────────────────────
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s    # give model time to load before first check
