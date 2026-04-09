@@ -32,20 +32,27 @@ Before getting started, make sure you have:
 
 ```
 doc-layout-api/
-├── app/
-│   ├── main.py        # FastAPI app factory + lifespan (startup/shutdown)
-│   ├── routes.py      # HTTP endpoints
-│   ├── inference.py   # Pipeline: decode → preprocess → infer → postprocess
-│   ├── model.py       # Singleton model loader
-│   ├── schemas.py     # Pydantic request/response schemas
-│   └── config.py      # Settings via environment variables
-├── tests/
-│   ├── test_inference.py   # Unit tests (no model needed)
-│   └── test_routes.py      # Integration tests (mocked model)
-├── models/            # Place model weights here (gitignored)
-├── Dockerfile
-├── docker-compose.yml
-└── requirements.txt
+├── app/                       # Main API application package
+│   ├── __init__.py           # Package initialization
+│   ├── main.py               # FastAPI app factory + lifespan (startup/shutdown)
+│   ├── routes.py             # HTTP endpoints (/api/v1/predict, /api/v1/health)
+│   ├── inference.py          # Pipeline: decode → preprocess → infer → postprocess
+│   ├── model.py              # Singleton model loader (loads on startup)
+│   ├── schemas.py            # Pydantic request/response schemas
+│   └── config.py             # Settings via environment variables
+├── tests/                     # Test suite
+│   ├── conftest.py           # Pytest configuration and fixtures
+│   ├── test_inference.py      # Unit tests (no model needed)
+│   └── test_routes.py        # Integration tests (mocked model)
+├── .env.example              # Example environment variables (copy to .env)
+├── .gitignore                # Git ignore file
+├── Dockerfile                # Docker image definition
+├── docker-compose.yml        # Docker Compose configuration
+├── install.sh                # Installation script (handles detectron2 setup)
+├── pytest.ini                # Pytest configuration
+├── requirements.txt          # Python dependencies
+├── test_api.py               # Manual API testing file
+└── README.md                 # This file
 ```
 
 ---
