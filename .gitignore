@@ -21,6 +21,11 @@ models/*.pt
 models/*.pth
 models/*.onnx
 models/*.bin
+models/*.safetensors
+models/.cache/
+hf-cache/
+data/evaluation_samples/
+artifacts/evaluation/
 
 # Docker
 .dockerignore
@@ -37,3 +42,10 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

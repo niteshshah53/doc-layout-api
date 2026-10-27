@@ -1,321 +1,336 @@
-# Document Layout Detection API
+# Layout Vision
 
-A production-ready REST API that detects objects and regions in images using a Faster R-CNN model trained on the COCO dataset.
+Layout Vision is a document-layout detection portfolio project that turns a
+page image into an interactive visual map of its structure. It identifies
+regions such as headings, paragraphs, tables, figures, captions, and page
+headers, then returns their labels, confidence scores, and original-image
+bounding boxes through a FastAPI service.
 
-**What does it do?**  
-Upload an image and it will automatically detect objects, identify their locations with bounding boxes, and provide confidence scores. Works with general images containing people, animals, vehicles, furniture, and other common objects. Perfect for image analysis, object detection pipelines, and automated content understanding.
+The project combines a React + TypeScript visualization with real inference
+from the Docling Heron model. It demonstrates model integration, API design,
+input validation, responsive coordinate-aware visualization, testing, Docker
+packaging, and qualitative evaluation on real document pages.
 
----
+![Layout Vision demo](docs/demo/demo.gif)
 
-## Prerequisites
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react&logoColor=111827)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-3178C6?logo=typescript&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-CPU%20deployment-2496ED?logo=docker&logoColor=white)
 
-Before getting started, make sure you have:
-- **Python 3.9+** installed ([download here](https://www.python.org/downloads/))
-- **Git** installed ([download here](https://git-scm.com/))
-- (Optional) **Docker** for containerized deployment ([download here](https://www.docker.com/))
-- (Optional) **NVIDIA GPU** with CUDA toolkit for faster inference (CPU-only is also supported)
+## What does it do?
 
-**Not sure what these are?** Don't worry! The quickstart guide below will walk you through everything step-by-step.
+Documents are made of different visual regions: titles, section headings,
+paragraphs, lists, tables, figures, captions, formulas, and page furniture.
+Layout Vision locates those regions and draws boxes around them so that the
+page structure can be inspected before downstream processing.
 
----
+This type of layout signal can support applications such as:
 
-## Tech Stack
-- **FastAPI** — Web framework for building the API
-- **Detectron2 + layoutparser** — COCO-Detection Faster R-CNN model for general object detection
-- **PyTorch 2.5.1** — Deep learning library
-- **Docker** — Package the app to run anywhere
-- **Pydantic** — Validation for inputs/outputs
+- document digitization and preprocessing;
+- organizing scanned reports and research papers;
+- preparing pages for downstream OCR or information extraction;
+- document-search and document-understanding pipelines.
 
----
+Layout detection is not OCR. This project identifies where regions are and
+what layout class they resemble; it does not read all document text, perform
+full text extraction, or extract individual table cells.
 
-## Project Structure
+## User experience
 
+The frontend is a separate React + TypeScript + Vite application under
+[`frontend/`](frontend/). The current workflow is:
+
+1. Upload a supported document image by browsing or dragging it into the
+   upload area.
+2. Submit the image to the real `POST /api/v1/predict` endpoint.
+3. View the original page with responsive Heron bounding-box overlays.
+4. Inspect predicted labels, confidence scores, coordinates, region counts,
+   distinct labels, and inference time.
+5. Filter detections by label, select a result or box to synchronize the
+   highlight, and clear filters to restore all detections.
+6. Zoom, fit, show or hide boxes, and show or hide labels while preserving
+   original-image coordinate alignment.
+7. Receive clear client-side validation, loading, empty-result, backend, and
+   inference-error states.
+
+The interface does not add OCR, authentication, persistence, table-cell
+extraction, or a multi-page PDF workflow.
+
+## Technical architecture
+
+```mermaid
+flowchart LR
+    U[User uploads image] --> F[React + TypeScript frontend]
+    F -->|POST /api/v1/predict multipart file| A[FastAPI API]
+    A --> H[Docling Heron RT-DETR v2]
+    H --> J[JSON labels scores boxes]
+    J --> F
+    F --> V[Interactive layout visualization]
 ```
-doc-layout-api/
-├── app/                       # Main API application package
-│   ├── __init__.py           # Package initialization
-│   ├── main.py               # FastAPI app factory + lifespan (startup/shutdown)
-│   ├── routes.py             # HTTP endpoints (/api/v1/predict, /api/v1/health)
-│   ├── inference.py          # Pipeline: decode → preprocess → infer → postprocess
-│   ├── model.py              # Singleton model loader (loads on startup)
-│   ├── schemas.py            # Pydantic request/response schemas
-│   └── config.py             # Settings via environment variables
-├── tests/                     # Test suite
-│   ├── conftest.py           # Pytest configuration and fixtures
-│   ├── test_inference.py      # Unit tests (no model needed)
-│   └── test_routes.py        # Integration tests (mocked model)
-├── .env.example              # Example environment variables (copy to .env)
-├── .gitignore                # Git ignore file
-├── Dockerfile                # Docker image definition
-├── docker-compose.yml        # Docker Compose configuration
-├── install.sh                # Installation script (handles detectron2 setup)
-├── pytest.ini                # Pytest configuration
-├── requirements.txt          # Python dependencies
-├── test_api.py               # Manual API testing file
-└── README.md                 # This file
+
+### Request flow and responsibilities
+
+- **Frontend:** validates supported image files, sends multipart requests,
+  displays the returned page and overlays, and provides filtering, selection,
+  zoom, and visibility controls.
+- **API:** validates MIME type and file size, loads the model once at startup,
+  runs the inference pipeline, maps detections to original image dimensions,
+  and reports model or inference failures with HTTP errors.
+- **Model adapter:** loads
+  [`docling-project/docling-layout-heron`](https://huggingface.co/docling-project/docling-layout-heron)
+  through Transformers and maps its 17 document-layout classes to API labels.
+
+The prediction endpoint is:
+
+```text
+POST http://localhost:8000/api/v1/predict
+multipart field: file
 ```
 
----
+Representative response shape:
 
-## Installation & Quick Start (For Beginners)
-
-### Step 1: Clone the Repository
-```bash
-# Copy the repository to your computer
-git clone https://github.com/niteshshah53/doc-layout-api.git
-cd doc-layout-api
+```json
+{
+  "num_blocks": 2,
+  "image_size": {"width": 2480, "height": 3508},
+  "inference_time_ms": 412.5,
+  "blocks": [
+    {
+      "label": "Title",
+      "score": 0.97,
+      "bbox": {"x1": 180, "y1": 120, "x2": 2280, "y2": 260}
+    }
+  ]
+}
 ```
 
-### Step 2: Create a Virtual Environment
-A virtual environment isolates this project's dependencies from others on your computer.
+Bounding boxes are returned in original uploaded-image pixel coordinates.
+Images may be resized internally for inference, but the API maps the results
+back to the original dimensions.
 
-```bash
-# Create the environment
+Health status is available at:
+
+```text
+GET http://localhost:8000/api/v1/health
+```
+
+## Model, labels, and license
+
+The configured model is
+[`docling-project/docling-layout-heron`](https://huggingface.co/docling-project/docling-layout-heron),
+an RT-DETR v2 document-layout detector. It is not a generic COCO object
+detector and should not be described as a document OCR or text-understanding
+model.
+
+The model exposes these labels:
+
+`Caption`, `Footnote`, `Formula`, `List-item`, `Page-footer`, `Page-header`,
+`Picture`, `Section-header`, `Table`, `Text`, `Title`, `Document Index`,
+`Code`, `Checkbox-Selected`, `Checkbox-Unselected`, `Form`, and
+`Key-Value Region`.
+
+The model card and Hugging Face metadata specify the **Apache-2.0** license.
+Weights and processor configuration are downloaded automatically on first
+startup; the verified model revision is approximately 172 MB. This project
+does not download or train on the full DocLayNet dataset. See the broader
+[Docling model repository](https://huggingface.co/docling-project/docling-models)
+for related model and task documentation.
+
+## Engineering highlights
+
+- Integrated a maintained document-layout model through its documented
+  Transformers inference API.
+- Exposed a typed FastAPI contract with health, prediction, validation, and
+  explicit model/inference error handling.
+- Preserved original-image coordinates through preprocessing and responsive
+  frontend scaling.
+- Built a responsive document workspace with label filtering, synchronized
+  selection, zoom, fit-to-view, confidence-first results, and independent
+  box/label visibility.
+- Added automated backend tests and frontend Vitest coverage for API handling,
+  file validation, and bounding-box geometry.
+- Added a reproducible CPU Docker path and a real-document evaluation workflow.
+
+## Qualitative evaluation
+
+The repository includes six public-domain NASA technical-report page examples
+in [`docs/images/evaluation/`](docs/images/evaluation/). The gallery includes
+text-rich pages, a genuine table page, and a figure page with a visible
+caption:
+
+![Heron evaluation contact sheet](docs/images/evaluation/contact-sheet.png)
+
+![NASA exploration summary](docs/images/evaluation/nasa-exploration-summary.png)
+
+![NASA microelectronics report](docs/images/evaluation/nasa-microelectronics-report.png)
+
+![NASA IMP J report](docs/images/evaluation/nasa-impj-report.png)
+
+![NASA range safety report](docs/images/evaluation/nasa-range-safety-report.png)
+
+![NASA exploration table](docs/images/evaluation/nasa-exploration-table.png)
+
+![NASA exploration figure](docs/images/evaluation/nasa-exploration-figure.png)
+
+The evaluation utility is [`scripts/evaluate_layout.py`](scripts/evaluate_layout.py).
+It downloads selected NASA NTRS PDFs, renders specified pages, runs the actual
+Heron pipeline, and writes raw JSON, annotated PNGs, a summary, and a report
+under the ignored `artifacts/evaluation/` directory. The checked-in gallery
+images above are the inspected examples; generated reports are intentionally
+not tracked.
+
+Sources and attribution:
+
+- [Exploration Studies Technical Report, Volume 1](https://ntrs.nasa.gov/citations/19890007335),
+  NASA NTRS, U.S. government work.
+- [Center for Space Microelectronics Technology, 1993 Technical Report](https://ntrs.nasa.gov/citations/19970014917),
+  NASA NTRS, U.S. government work.
+- [IMP J Summary Technical Report](https://ntrs.nasa.gov/citations/19740009451),
+  NASA NTRS, U.S. government work.
+- [2013 NASA Range Safety Annual Report](https://ntrs.nasa.gov/citations/20140012574),
+  NASA NTRS, U.S. government work.
+
+This is a qualitative inspection, not a benchmark or accuracy study. It has
+no ground-truth metrics and does not establish production accuracy across
+document types. The table and figure pages test whether those visible regions
+receive appropriate predictions; their presence on a page is not proof that
+the model detects them correctly. The evaluator records actual labels,
+confidence scores, counts, and visible misses in its generated report.
+
+## Requirements
+
+- Windows PowerShell or an equivalent shell.
+- Python 3.11.
+- Node.js and npm for the frontend.
+- Network access on first model startup to download Heron weights.
+- Docker Desktop with Compose, if using the container path.
+
+The verified dependency versions are listed in
+[`requirements.txt`](requirements.txt) and
+[`frontend/package.json`](frontend/package.json). CPU inference is the
+verified deployment path. CUDA can be selected for a compatible host-native
+PyTorch installation, but GPU inference is not claimed as verified by this
+project.
+
+## Run locally
+
+### Backend
+
+From the repository root:
+
+```powershell
 python -m venv .venv
-
-# Activate it
-# On macOS/Linux:
-source .venv/bin/activate
-
-# On Windows:
-.venv\Scripts\activate
-
-# You should see (.venv) at the start of your terminal prompt
-```
-
-### Step 3: Install Dependencies
-```bash
-# Upgrade pip first
-pip install --upgrade pip
-
-# Install all required packages
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+$env:DEVICE = "cpu"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-**⚠️ Important:** This project requires PyTorch 2.5.1+ and torchvision 0.20.1+ for compatibility. If you encounter errors:
-```bash
-bash install.sh
-```
-This script automatically installs compatible versions and configures Detectron2.
+The first startup downloads Heron and its processor configuration into the
+normal Hugging Face cache. Set `HF_HOME` or
+`HUGGINGFACE_HUB_CACHE` to a local ignored directory if you need to control
+the cache location. Do not commit model weights, caches, or datasets.
 
-### Step 4: Setup Configuration
-```bash
-# Copy the example environment file
-cp .env.example .env
+The interactive API documentation is available at
+[`http://localhost:8000/docs`](http://localhost:8000/docs), and health is
+available at [`http://localhost:8000/api/v1/health`](http://localhost:8000/api/v1/health).
 
-# Optional: Edit .env if you want to use CPU instead of GPU
-# Change: DEVICE=cuda to DEVICE=cpu
-```
+### Frontend
 
-### Step 5: Run the API
-```bash
-# Start the API server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+In a second PowerShell window:
 
-You should see output like:
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000
-INFO:     Press CTRL+C to quit
+```powershell
+Set-Location frontend
+npm install
+Copy-Item .env.example .env
+npm run dev
 ```
 
-### Step 6: Test the API
-Open your browser and go to: **http://localhost:8000/docs**
+The Vite development server prints its local URL. The default frontend API
+base URL is `http://localhost:8000`. Configure another backend in
+`frontend/.env`:
 
-You'll see an interactive interface where you can test the API by uploading a document image!
+```text
+VITE_API_BASE_URL=http://localhost:8000
+```
 
----
+The frontend is served separately from the API. FastAPI already enables the
+development CORS configuration needed for local browser calls.
 
-## Quick Start (Docker - Simpler Alternative)
+## Tests and production build
 
-If you prefer not to install Python dependencies locally, use Docker:
+Backend tests do not download model weights:
 
-```bash
-# Build and run with Docker (uses GPU if available)
+```powershell
+Set-Location D:\project\doc-layout-api
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Frontend tests and the production build:
+
+```powershell
+Set-Location D:\project\doc-layout-api\frontend
+npm test
+npm run build
+```
+
+An opt-in real-model regression test is available when model download and
+inference are intentionally desired:
+
+```powershell
+Set-Location D:\project\doc-layout-api
+$env:RUN_REAL_MODEL_TESTS = "1"
+.\.venv\Scripts\python.exe -m pytest tests/test_real_inference.py -v
+```
+
+## Docker Compose
+
+The supplied image is CPU-based and installs official CPU PyTorch wheels. It
+avoids Detectron2 and CUDA compilation:
+
+```powershell
+docker compose config
 docker compose up --build
 ```
 
-**Without GPU (CPU only):**
-```bash
-DEVICE=cpu docker compose up --build
+The API is available at
+[`http://localhost:8000/docs`](http://localhost:8000/docs). Stop it with:
+
+```powershell
+docker compose down
 ```
 
-The API will be available at: http://localhost:8000/docs
+Weights are downloaded at container startup, not baked into the image. For
+repeated local runs, configure an external Hugging Face cache mount outside
+Git. GPU Docker support requires a CUDA-enabled image, compatible PyTorch
+wheel, NVIDIA Container Toolkit, and a compatible host GPU; that path is not
+verified here.
 
----
+## Limitations
 
-## Troubleshooting for Beginners
+- Input is a single document image; there is no built-in multi-page PDF
+  workflow.
+- The project does not perform OCR or full text extraction.
+- It does not extract table cells or reconstruct table structure.
+- Detection quality can vary with scan quality, document design, and page
+  layout.
+- CPU inference is verified. GPU inference is not claimed as tested.
+- The qualitative examples are not a substitute for a ground-truth benchmark.
 
-**Q: I get "command not found: python"**  
-A: Python isn't installed or not in your PATH. [Install Python](https://www.python.org/downloads/) and retry.
+## Skills demonstrated
 
-**Q: Virtual environment activation didn't work**  
-A: Make sure you're in the project directory (`doc-layout-api/`) and try again.
+Python · PyTorch · Transformers · FastAPI · React · TypeScript · REST API
+integration · image-coordinate geometry · automated testing · Docker CPU
+deployment · qualitative computer-vision evaluation
 
-**Q: "pip install" fails**  
-A: Try upgrading pip first:
-```bash
-python -m pip install --upgrade pip
-```
+## Future improvements
 
-**Q: "detectron2" installation fails**  
-A: Run `bash install.sh` instead — it handles special cases.
+Potential next steps, explicitly outside the current scope:
 
-**Q: GPU not detected**  
-A: Use CPU instead by setting `DEVICE=cpu` in `.env`
-
-**Q: Still stuck?**  
-A: Check you're using Python 3.9+ (`python --version`)
-
----
-
-## How to Use the API
-
-### Upload a Document Image
-
-**Easiest Way: Use the Web UI**
-1. Go to http://localhost:8000/docs
-2. Click "Try it out"
-3. Upload a document image (PNG, JPEG, TIFF, etc.)
-4. Click "Execute"
-
-**Using cURL (Command Line):**
-```bash
-curl -X POST "http://localhost:8000/api/v1/predict" \
-  -H "accept: application/json" \
-  -F "file=@path/to/your/document.png"
-```
-
-**Using Python:**
-```python
-import requests
-
-files = {"file": open("document.png", "rb")}
-response = requests.post("http://localhost:8000/api/v1/predict", files=files)
-print(response.json())
-```
-
-### Example Response
-```json
-{
-  "num_blocks": 2,
-  "image_size": {"width": 1344, "height": 2016},
-  "inference_time_ms": 418.39,
-  "blocks": [
-    {
-      "label": "Object",
-      "score": 0.9542,
-      "bbox": {"x1": 120.0, "y1": 98.0, "x2": 1240.0, "y2": 800.0}
-    },
-    {
-      "label": "Object",
-      "score": 0.8913,
-      "bbox": {"x1": 150.0, "y1": 850.0, "x2": 1200.0, "y2": 1500.0}
-    }
-  ]
-}
-```
-
----
-
-## Running Tests (Optional)
-
-To verify everything works correctly:
-```bash
-pytest
-```
-
----
-
-## API Endpoints
-
-### `POST /api/v1/predict`
-Upload a document image, receive layout predictions.
-
-**Request:** `multipart/form-data`
-- `file`: image file (PNG, JPEG, TIFF, BMP, WEBP) — max 10MB
-
-**Response:**
-```json
-{
-  "num_blocks": 2,
-  "image_size": {"width": 1344, "height": 2016},
-  "inference_time_ms": 418.39,
-  "blocks": [
-    {
-      "label": "Object",
-      "score": 0.9542,
-      "bbox": {"x1": 120.0, "y1": 98.0, "x2": 1240.0, "y2": 800.0}
-    },
-    {
-      "label": "Object",
-      "score": 0.8913,
-      "bbox": {"x1": 150.0, "y1": 850.0, "x2": 1200.0, "y2": 1500.0}
-    }
-  ]
-}
-```
-
-### `GET /api/v1/health`
-Health check endpoint for Docker/load balancer monitoring. Returns model status including which variant is loaded (primary/fallback).
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "model_loaded": true,
-  "model_info": {
-    "type": "primary",
-    "error": null
-  },
-  "version": "1.0.0"
-}
-```
-
----
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-Tests run without a GPU or real model (mocked).
-
----
-
-## Configuration
-
-All settings can be overridden via environment variables or `.env`:
-
-| Variable | Default | Description |
-|---|---|---|
-| `DEVICE` | `cuda` | `cuda` or `cpu` |
-| `MODEL_SCORE_THRESHOLD` | `0.5` | Minimum confidence to return a block |
-| `MAX_IMAGE_SIZE` | `1024` | Resize longest edge to this (px) |
-| `MAX_FILE_SIZE_MB` | `10` | Reject uploads larger than this |
-| `DEBUG` | `false` | Enable debug logging |
-
----
-
-## Model & Performance
-
-### Current Model
-- **Type:** Faster R-CNN with ResNet-50 backbone trained on COCO dataset
-- **Detects:** General objects (people, vehicles, animals, furniture, etc.)
-- **Does NOT detect:** Document-specific elements (titles, paragraphs, tables)
-
-### Fallback Mechanism
-If the primary model fails to load, the API automatically cascades through:
-1. **Primary:** COCO-Detection Faster R-CNN (GPU)
-2. **Fallback-1:** Mask R-CNN variant (GPU)
-3. **Fallback-2:** Same model on CPU (slower but always available)
-
-The `/api/v1/health` endpoint shows which model is loaded.
-
-### Performance Notes
-- Model loads **once at startup** — not per request (typically 1-2 seconds)
-- `torch.no_grad()` applied during inference — ~50% less GPU memory
-- Images are resized to `MAX_IMAGE_SIZE` before inference
-- Typical GPU inference time: **50–500ms** per image (depends on image complexity)
-- GPU memory used: ~0.17GB with default settings
+- multi-page PDF upload and page navigation;
+- OCR integration and text-region extraction;
+- table-cell and table-structure extraction;
+- broader quantitative evaluation with representative ground-truth data;
+- deployment-specific GPU validation and performance profiling.

@@ -16,7 +16,7 @@ This separation means you can unit-test inference.py without
 starting an HTTP server.
 """
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from loguru import logger
 
 from app.config import get_settings
@@ -34,12 +34,12 @@ settings = get_settings()
     response_model=HealthResponse,
     summary="Health check",
     description=(
-        "Returns service health status including which model is loaded (primary/fallback). "
+        "Returns service health status including which Docling layout model is loaded. "
         "Used by Docker HEALTHCHECK and load balancers."
     ),
     tags=["Monitoring"],
 )
-async def health_check() -> HealthResponse:
+async def health_check(response: Response) -> HealthResponse:
     model_info = app.model.get_model_info()
     model_info_dict = None
     
@@ -49,8 +49,11 @@ async def health_check() -> HealthResponse:
             "error": model_info.error,
         }
     
+    if not model_info.loaded:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
     return HealthResponse(
-        status="ok",
+        status="ok" if model_info.loaded else "degraded",
         model_loaded=model_info.loaded,
         model_info=model_info_dict,
         version=settings.app_version,
@@ -69,9 +72,8 @@ async def health_check() -> HealthResponse:
     },
     summary="Detect document layout",
     description=(
-        "Upload a document image (PNG, JPEG, TIFF, BMP, WEBP). "
-        "Returns detected layout blocks (text, title, table, figure, list) "
-        "with confidence scores and bounding box coordinates."
+        "Upload a document image (PNG, JPEG, TIFF, BMP, WEBP). Returns Docling "
+        "document-layout detections with confidence scores and bounding boxes."
     ),
     tags=["Inference"],
 )

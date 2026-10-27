@@ -18,7 +18,6 @@ THE LIFESPAN PATTERN (contextmanager):
 
 from contextlib import asynccontextmanager
 
-import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -52,23 +51,12 @@ async def lifespan(app: FastAPI):
         logger.error(f"✗ Model failed to load: {model_info.error}")
         logger.error("The API will start but inference requests will fail (503 Service Unavailable)")
 
-    if torch.cuda.is_available():
-        logger.info(f"CUDA device: {torch.cuda.get_device_name(0)}")
-        if model_info.loaded:
-            logger.info(
-                f"GPU memory after model load: "
-                f"{torch.cuda.memory_allocated() / 1e9:.2f}GB allocated"
-            )
-
     logger.info("Application ready ✓")
 
     yield  # ← application runs while we're yielded here
 
     # ── SHUTDOWN ─────────────────────────────────────────────────────────
     logger.info("Shutting down...")
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        logger.info("GPU cache cleared ✓")
 
 
 def create_app() -> FastAPI:
@@ -86,9 +74,8 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description=(
-            "Production-ready REST API for document layout segmentation. "
-            "Detects text blocks, titles, tables, figures, and lists "
-            "in document images using a PubLayNet-trained Detectron2 model."
+            "REST API for document-layout detection using the Docling Heron "
+            "RT-DETR model trained for document pages."
         ),
         lifespan=lifespan,
         docs_url="/docs",       # Swagger UI

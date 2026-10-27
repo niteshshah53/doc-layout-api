@@ -16,7 +16,7 @@ SEPARATION FROM BUSINESS LOGIC:
   This prevents circular imports and keeps each module's job clear.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BoundingBox(BaseModel):
@@ -44,12 +44,12 @@ class BoundingBox(BaseModel):
 
 class LayoutBlock(BaseModel):
     """
-    A single detected layout element (text block, title, table, etc.)
+    A single detected document-layout element.
     """
     label: str = Field(
         ...,
         description="Detected class label",
-        examples=["Text", "Title", "Table", "Figure", "List"],
+        examples=["Title", "Text", "Table", "Picture"],
     )
     score: float = Field(
         ...,
@@ -94,6 +94,8 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response for the /health endpoint — used by Docker/k8s health checks."""
+    model_config = ConfigDict(protected_namespaces=())
+
     status: str
     model_loaded: bool
     model_info: dict | None = Field(

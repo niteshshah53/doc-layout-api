@@ -6,8 +6,8 @@ The core inference pipeline: image bytes → structured predictions.
 PIPELINE STAGES:
   1. decode_image()      — raw bytes → PIL Image (validate format)
   2. preprocess()        — resize to safe dimensions, convert to numpy
-  3. run_inference()     — layoutparser detection with torch.no_grad()
-  4. postprocess()       — convert layoutparser Layout → clean Python dicts
+  3. run_inference()     — Docling Heron RT-DETR detection
+  4. postprocess()       — convert detections to clean API blocks
 
 WHY THIS SEPARATION:
   Each stage is independently testable and replaceable.
@@ -45,7 +45,7 @@ def decode_image(image_bytes: bytes) -> Image.Image:
         image = Image.open(io.BytesIO(image_bytes))
         image.verify()                          # checks file integrity
         image = Image.open(io.BytesIO(image_bytes))  # re-open after verify (verify closes it)
-    except (UnidentifiedImageError, Exception) as e:
+    except (UnidentifiedImageError, OSError, ValueError) as e:
         raise ValueError(f"Cannot decode image: {e}") from e
 
     if image.format not in ALLOWED_FORMATS:
@@ -88,7 +88,6 @@ def preprocess(image: Image.Image) -> tuple[np.ndarray, tuple[int, int]]:
         image = image.resize((new_w, new_h), Image.LANCZOS)
         logger.debug(f"Resized image: {original_size} → ({new_w}, {new_h})")
 
-    # layoutparser expects a plain numpy uint8 array, NOT a tensor
     numpy_image = np.array(image)
     return numpy_image, original_size
 
@@ -140,8 +139,7 @@ def postprocess(
 
     blocks = []
     for block in layout:
-        # layoutparser Rectangle has .coordinates = (x_1, y_1, x_2, y_2)
-        x1, y1, x2, y2 = block.block.coordinates
+        x1, y1, x2, y2 = block.coordinates
 
         # Scale back to original image coordinates
         bbox = BoundingBox(
@@ -153,8 +151,8 @@ def postprocess(
 
         blocks.append(
             LayoutBlock(
-                label=block.type,
-                score=round(float(block.score), 4),
+                label=block.label,
+                score=round(block.score, 4),
                 bbox=bbox,
             )
         )

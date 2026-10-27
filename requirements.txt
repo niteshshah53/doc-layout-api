@@ -15,18 +15,10 @@ python-multipart==0.0.9           # Required for file uploads (e.g., document im
 # ============================================
 # MACHINE LEARNING & AI (PyTorch)
 # ============================================
-# These packages power the document layout detection model
+# These packages power the Docling Heron document-layout model
 torch==2.3.0                      # PyTorch - deep learning framework
 torchvision==0.18.0               # Computer vision library (image processing for AI)
-timm==1.0.3                       # Pre-trained model weights and architectures
-
-# ============================================
-# DOCUMENT LAYOUT DETECTION
-# ============================================
-# The AI model that actually detects layouts in documents
-layoutparser==0.3.4               # Document layout parsing library
-# NOTE: detectron2 (part of layoutparser) must be installed AFTER torch
-# If installation fails, use: bash install.sh
+transformers==4.53.0              # RT-DETR v2 model and image processor
 
 # ============================================
 # IMAGE PROCESSING
@@ -55,4 +47,3 @@ loguru==0.7.2                     # Better logging than Python's built-in (helpf
 # These are only used when running tests with: pytest
 pytest==8.2.2                     # Testing framework
 httpx==0.27.0                     # Async HTTP client for testing the API
-

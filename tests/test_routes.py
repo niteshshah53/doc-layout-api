@@ -37,8 +37,9 @@ def client():
     so the lifespan will succeed with a mock model.
     """
     app = create_app()
-    with TestClient(app) as c:
-        yield c
+    with patch("app.model.load_model", return_value=(MagicMock(), "primary", None)):
+        with TestClient(app) as c:
+            yield c
 
 
 def make_png_bytes(width: int = 400, height: int = 600) -> bytes:
@@ -84,6 +85,13 @@ class TestHealthCheck:
     def test_status_ok(self, client):
         data = client.get("/api/v1/health").json()
         assert data["status"] == "ok"
+
+    def test_unavailable_model_returns_503(self, client):
+        unavailable = MagicMock(loaded=False, model_type=None, error="weights unavailable")
+        with patch("app.model.get_model_info", return_value=unavailable):
+            response = client.get("/api/v1/health")
+        assert response.status_code == 503
+        assert response.json()["status"] == "degraded"
 
 
 # ── Predict endpoint tests ────────────────────────────────────────────────────

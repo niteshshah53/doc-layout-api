@@ -21,9 +21,9 @@ import io
 import numpy as np
 import pytest
 from PIL import Image
-from unittest.mock import MagicMock, patch
 
 from app.inference import decode_image, postprocess, preprocess
+from app.model import LayoutDetection
 from app.schemas import BoundingBox, LayoutBlock
 
 
@@ -112,15 +112,10 @@ class TestPreprocess:
 
 class TestPostprocess:
     def _make_mock_layout(self, boxes: list) -> list:
-        """Create mock layoutparser block objects."""
-        blocks = []
-        for label, score, coords in boxes:
-            block = MagicMock()
-            block.type = label
-            block.score = score
-            block.block.coordinates = coords   # (x1, y1, x2, y2)
-            blocks.append(block)
-        return blocks
+        return [
+            LayoutDetection(label=label, score=score, coordinates=coords)
+            for label, score, coords in boxes
+        ]
 
     def test_no_resize_coordinates_unchanged(self):
         """If original == resized, coordinates should be unchanged."""
